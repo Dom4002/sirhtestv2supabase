@@ -1641,63 +1641,51 @@ async function secureFetch(url, options = {}) {
 
 
 
+async function handleLogin(e) { 
+    e.preventDefault(); 
+    
+    // On récupère les valeurs
+    const email = document.getElementById('login-user').value.trim(); // Supabase a besoin de l'email
+    const password = document.getElementById('login-pass').value.trim();
+    const btn = document.getElementById('btn-login');
+    
+    // Feedback visuel
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Connexion...'; 
+    btn.disabled = true;
 
-    async function handleLogin(e) { 
-                e.preventDefault(); 
-                // Déverrouille l'audio pour mobile
-                NOTIF_SOUND.play().then(() => { NOTIF_SOUND.pause(); NOTIF_SOUND.currentTime = 0; }).catch(() => {});
-                
-                // On tente quand même, même si le navigateur dit hors ligne (parfois il se trompe)
-                // if(!navigator.onLine) ... <-- SUPPRIMÉ
-                
-                const u = document.getElementById('login-user').value.trim();
-                const p = document.getElementById('login-pass').value.trim();
-                const btn = document.getElementById('btn-login');
-                const originalBtnText = btn.innerHTML; 
-                
-                btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Connexion...'; 
-                btn.disabled = true;
-                btn.classList.add('opacity-50', 'cursor-not-allowed');
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 15000); 
+    try {
+        // Appel au nouveau serveur local
+        const response = await fetch(`${SIRH_CONFIG.apiBaseUrl}/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
 
-                try {
-                    const response = await fetch(`${URL_LOGIN}?u=${encodeURIComponent(u.toLowerCase())}&p=${encodeURIComponent(p)}`, { signal: controller.signal });
-                    clearTimeout(timeoutId); 
-                    
-                    const d = await response.json();
-                    
-                    if(d.status === "success") { 
-                        if(d.token) localStorage.setItem('sirh_token', d.token);
-                        let r = d.role || "EMPLOYEE"; if(Array.isArray(r)) r = r[0]; 
-                        
-                        const userData = { nom: d.nom || u, role: String(r).toUpperCase(), id: d.id };
-                        localStorage.setItem('sirh_user_session', JSON.stringify(userData));
-
-                        const Toast = Swal.mixin({toast: true, position: 'top-end', showConfirmButton: false, timer: 2000});
-                        Toast.fire({icon: 'success', title: 'Bienvenue ' + userData.nom});
-                        
-                    await setSession(userData.nom, userData.role, userData.id); 
-                    } else { 
-                        Swal.fire('Refusé', 'Identifiant ou mot de passe incorrect', 'error'); 
-                    }
-                } catch (error) {
-                    // C'est ICI qu'on gère vraiment l'erreur de connexion
-                    console.error(error);
-                    if (error.name === 'AbortError') { 
-                        Swal.fire('Délai dépassé', 'Le serveur met du temps à répondre. Vérifiez votre connexion.', 'warning'); 
-                    } else if (!navigator.onLine) {
-                        Swal.fire('Hors Ligne', 'Vous semblez déconnecté d\'internet.', 'error');
-                    } else { 
-                        Swal.fire('Erreur Système', 'Impossible de contacter le serveur. Réessayez.', 'error'); 
-                    }
-                } finally {
-                    btn.innerHTML = originalBtnText; btn.disabled = false; btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                }
-            }
-
-
+        const d = await response.json();
+        
+        if(d.status === "success") { 
+            // Stockage de la session
+            localStorage.setItem('sirh_token', d.token);
+            const userData = { nom: d.nom, role: d.role.toUpperCase(), id: d.id };
+            localStorage.setItem('sirh_user_session', JSON.stringify(userData));
+            
+            // Lancement de l'app
+            const Toast = Swal.mixin({toast: true, position: 'top-end', showConfirmButton: false, timer: 2000});
+            Toast.fire({icon: 'success', title: 'Bienvenue ' + userData.nom});
+            
+            await setSession(userData.nom, userData.role, userData.id); 
+        } else { 
+            Swal.fire('Refusé', d.error || 'Email ou mot de passe incorrect', 'error'); 
+        }
+    } catch (error) {
+        console.error(error);
+        Swal.fire('Erreur Connexion', 'Impossible de joindre le serveur local (Vérifiez que "node server.js" tourne bien).', 'error'); 
+    } finally {
+        btn.innerHTML = originalText; 
+        btn.disabled = false;
+    }
+}
 
 
 
