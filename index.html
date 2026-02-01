@@ -3518,83 +3518,73 @@ function switchView(v) {
     }
 
 
-                                        async function handleOnboarding(e) {
-                e.preventDefault();
-                console.log("Tentative de création de profil...");
-
-                // 1. Vérification de la photo de profil (Obligatoire)
-                if (!capturedBlob) {
-                    return Swal.fire('Attention', 'La photo de profil est obligatoire pour créer un compte.', 'warning');
-                }
-
-                const fd = new FormData();
-
-                try {
-                    // 2. Récupération sécurisée des champs texte
-                    // On vérifie que les éléments existent avant de lire .value
-                    const getVal = (id) => {
-                        const el = document.getElementById(id);
-                        return el ? el.value : "";
-                    };
-
-                    fd.append('nom', getVal('f-nom'));
-                    fd.append('email', getVal('f-email'));
-                    fd.append('telephone', getVal('f-phone'));
-                    fd.append('dob', getVal('f-dob'));
-                    fd.append('adresse', getVal('f-address'));
-                    fd.append('date', getVal('f-date'));
-                    fd.append('poste', getVal('f-poste'));
-                    fd.append('dept', getVal('f-dept'));
-                    fd.append('limit', getVal('f-limit'));
-                    fd.append('role', getVal('f-role'));
-                    fd.append('agent', currentUser ? currentUser.nom : "Système");
-
-                    // 3. Ajout de la photo de profil (Obligatoire)
-                    fd.append('photo', capturedBlob, 'photo_profil.jpg');
-
-                    // 4. Ajout des documents KYC (Optionnels)
-                    // IMPORTANT : On vérifie s'ils existent AVANT de les ajouter
-                    if (docBlobs.id_card) fd.append('id_card', docBlobs.id_card, 'piece_identite.jpg');
-                    if (docBlobs.cv) fd.append('cv', docBlobs.cv, 'cv.jpg');
-                    if (docBlobs.diploma) fd.append('diploma', docBlobs.diploma, 'diplome.jpg');
-                    if (docBlobs.attestation) fd.append('attestation', docBlobs.attestation, 'attestation.jpg');
-
-                    // 5. Affichage du chargement
-                    Swal.fire({
-                        title: 'Création du dossier...',
-                        text: 'Envoi des informations et des documents au serveur sécurisé',
-                        didOpen: () => Swal.showLoading(),
-                        allowOutsideClick: false
-                    });
-
-                    // 6. Envoi au serveur Render
-                    const response = await secureFetch(URL_WRITE_POST, {
-                        method: 'POST',
-                        body: fd
-                    });
-
-                    if (response.ok) {
-                        await Swal.fire({
-                            icon: 'success',
-                            title: 'Profil créé !',
-                            text: 'Le collaborateur a été ajouté et ses accès ont été envoyés par email.',
-                            confirmButtonColor: '#2563eb'
-                        });
-                        
-                        fetchData(true); // On force uniquement la mise à jour de la liste des employés
-
-                    } else {
-                        const errorData = await response.json();
-                        throw new Error(errorData.error || "Erreur serveur");
-                    }
-
-                } catch (error) {
-                    console.error("Erreur lors de l'onboarding:", error);
-                    Swal.fire('Échec', "Impossible de créer le profil : " + error.message, 'error');
-                }
-            }
 
 
+
+
+
+
+
+
+
+            async function handleOnboarding(e) {
+    e.preventDefault();
+    
+    // On ne vérifie plus si capturedBlob est vide, c'est OPTIONNEL
+    const fd = new FormData();
+    const getVal = (id) => document.getElementById(id).value;
+
+    fd.append('nom', getVal('f-nom'));
+    fd.append('email', getVal('f-email'));
+    fd.append('telephone', getVal('f-phone'));
+    fd.append('dob', getVal('f-dob'));
+    fd.append('adresse', getVal('f-address'));
+    fd.append('date', getVal('f-date'));
+    fd.append('poste', getVal('f-poste'));
+    fd.append('dept', getVal('f-dept'));
+    fd.append('limit', getVal('f-limit'));
+    fd.append('role', getVal('f-role'));
+    fd.append('agent', currentUser.nom);
+
+    // Photo si elle existe
+    if (capturedBlob) {
+        fd.append('photo', capturedBlob, 'photo.jpg');
+    } else if (document.getElementById('file-upload').files[0]) {
+        fd.append('photo', document.getElementById('file-upload').files[0]);
+    }
+
+    // Documents KYC si remplis
+    if (docBlobs.id_card) fd.append('id_card', docBlobs.id_card, 'id_card.jpg');
+    if (docBlobs.cv) fd.append('cv', docBlobs.cv, 'cv.jpg');
+    if (docBlobs.diploma) fd.append('diploma', docBlobs.diploma, 'diploma.jpg');
+    if (docBlobs.attestation) fd.append('attestation', docBlobs.attestation, 'attestation.jpg');
+
+    Swal.fire({ title: 'Création du profil...', text: 'Génération du matricule et des accès...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+
+    try {
+        const response = await fetch(`${SIRH_CONFIG.apiBaseUrl}/write`, {
+            method: 'POST',
+            body: fd
+        });
+
+        const res = await response.json();
+        if (res.status === 'success') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Profil Créé !',
+                html: `L'employé a reçu ses accès.<br><b>Matricule généré : ${res.matricule}</b>`,
+                confirmButtonColor: '#2563eb'
+            });
+            e.target.reset();
+            resetCamera();
+            fetchData(true);
+        } else {
+            throw new Error(res.error);
+        }
+    } catch (error) {
+        Swal.fire('Erreur', error.message, 'error');
+    }
+}
 
 
 
